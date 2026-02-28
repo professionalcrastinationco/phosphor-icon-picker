@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phosphor Icon Picker</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    :root {
+      --icon-color: #000000;
+      --duo-fill-color: #000000;
+      --grid-size: 48px;
+      --pico-font-size: 100%;
+    }
+
+    /* Override Pico's container max-width to fill the window */
+    body, main, .app-layout {
+      max-width: 100% !important;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Layout: sidebar + main */
+    .app-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: #f1f5f9;
+      border-right: 1px solid var(--pico-muted-border-color);
+      padding: 1rem;
+      overflow-y: auto;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+    }
+
+    .sidebar h1 { font-size: 1.2rem; margin-bottom: 0.5rem; }
+    .sidebar h3 { font-size: 0.85rem; margin-bottom: 0.4rem; margin-top: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--pico-muted-color); }
+    .sidebar hr { border: none; border-top: 1px solid var(--pico-muted-border-color); margin: 1.875rem 0; }
+    .sidebar input[type="search"] { margin-bottom: 0.5rem; padding: 0.4rem 0.6rem 0.4rem 2.8rem; font-size: 0.85rem; background: #fff; }
+    .sidebar input[type="number"] { padding: 0.6rem; font-size: 0.8rem; font-family: monospace; width: 100%; height: auto; background: #fff; }
+
+    /* Filter chips */
+    .chip-group { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.5rem; }
+    .chip {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      border: 1px solid var(--pico-muted-border-color);
+      background: #fff;
+      color: var(--pico-color);
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    .chip:hover { border-color: var(--pico-primary); }
+    .chip.active { background: var(--pico-primary); color: white; border-color: var(--pico-primary); }
+
+    /* Shade filter */
+    .shade-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 2rem; }
+    .shade-chip {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      border: 1px solid var(--pico-muted-border-color);
+      background: #fff;
+      color: var(--pico-color);
+      font-weight: 500;
+    }
+    .shade-chip:hover { border-color: var(--pico-primary); }
+    .shade-chip.active { background: var(--pico-primary); color: white; border-color: var(--pico-primary); }
+
+    /* Color palette — compact grid layout */
+    .color-palette { display: flex; flex-direction: column; gap: 6px; margin-bottom: 0.5rem; }
+    .color-group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(22px, 1fr)); gap: 2px; }
+    .color-row { display: contents; }
+    .color-row-label { display: none; }
+    .color-swatches { display: contents; }
+    .color-swatch {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 3px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.1s;
+    }
+    .color-swatch:hover { transform: scale(1.3); z-index: 1; }
+    .color-swatch.active { border-color: var(--pico-color); box-shadow: 0 0 0 1px white; }
+
+    /* Quick options (size presets, rotation) */
+    .preset-group { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 0.4rem; }
+    .preset-btn {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      border: 1px solid var(--pico-muted-border-color);
+      background: #fff;
+      color: var(--pico-color);
+      font-weight: 500;
+    }
+    .preset-btn:hover { border-color: var(--pico-primary); }
+    .preset-btn.active { background: var(--pico-primary); color: white; border-color: var(--pico-primary); }
+
+    .size-section { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+    .size-section h3 { margin-top: 0.4rem; margin-bottom: 0.3rem; }
+    .size-section .preset-group { grid-column: 1 / -1; }
+    .size-input-row { display: flex; gap: 6px; align-items: center; margin-bottom: 0.4rem; }
+    .size-input-row input { flex: 1; }
+    .size-input-row span { font-size: 0.75rem; color: var(--pico-muted-color); }
+
+    /* Transform controls */
+    .transform-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.4rem; }
+    .transform-btn {
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      border: 1px solid var(--pico-muted-border-color);
+      background: #fff;
+      color: var(--pico-color);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .transform-btn:hover { border-color: var(--pico-primary); }
+    .transform-btn.active { background: var(--pico-primary); color: white; border-color: var(--pico-primary); }
+
+    /* Action buttons */
+    .actions { display: flex; gap: 6px; margin-top: 0.8rem; }
+    .actions button { flex: 1; font-size: 0.8rem; padding: 0.5rem; }
+
+    /* Main content: icon grid */
+    .main-content {
+      padding: 0.5rem 1rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      min-width: 0; /* prevent grid blowout */
+    }
+
+    .main-content.has-preview {
+      padding-bottom: 100px; /* space for fixed preview panel */
+    }
+
+    .grid-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+      flex-shrink: 0;
+    }
+
+    .icon-count { font-size: 0.8rem; color: var(--pico-muted-color); }
+
+    .icon-grid {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      grid-template-rows: repeat(10, 1fr);
+      gap: 2px;
+      flex: 1;
+      min-height: 0; /* allow shrink inside flex */
+      overflow: hidden;
+    }
+
+    .icon-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.15s;
+      text-align: center;
+      overflow: hidden;
+      min-width: 0;
+      min-height: 0;
+    }
+    .icon-card:hover { background: var(--pico-card-background-color); border-color: var(--pico-muted-border-color); }
+    .icon-card.selected { border-color: var(--pico-primary); background: var(--pico-card-background-color); }
+    .icon-card svg { width: 65%; max-height: 80%; aspect-ratio: 1; color: var(--icon-color); flex-shrink: 0; }
+    .icon-card .icon-name {
+      font-size: clamp(0.4rem, 0.6vw, 0.6rem);
+      margin-top: 2px;
+      color: var(--pico-muted-color);
+      line-height: 1.1;
+      max-width: 95%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0.3rem 0;
+      flex-shrink: 0;
+    }
+    .pagination button {
+      padding: 0.2rem 0.6rem;
+      font-size: 0.75rem;
+      margin: 0;
+    }
+    .pagination .page-info {
+      font-size: 0.75rem;
+      color: var(--pico-muted-color);
+      min-width: 100px;
+      text-align: center;
+    }
+
+    /* Preview panel (appears when icon selected) */
+    .preview-panel {
+      position: fixed;
+      bottom: 0;
+      left: 320px;
+      right: 0;
+      background: var(--pico-card-background-color);
+      border-top: 2px solid var(--pico-muted-border-color);
+      padding: 0.5rem 1.5rem;
+      display: none;
+      z-index: 10;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+    }
+    .preview-panel.visible { display: flex; gap: 1.5rem; align-items: center; }
+    .preview-sizes { display: flex; gap: 0.75rem; align-items: flex-end; }
+    .preview-size-item { text-align: center; }
+    .preview-size-item svg { color: var(--icon-color); }
+    .preview-size-label { font-size: 0.55rem; color: var(--pico-muted-color); margin-top: 1px; }
+    .preview-info { flex: 1; }
+    .preview-icon-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .preview-icon-meta { font-size: 0.7rem; color: var(--pico-muted-color); }
+
+    /* Toast notification */
+    .toast {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--pico-primary);
+      color: white;
+      padding: 0.5rem 1.5rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Loading state */
+    .loading-overlay {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 50vh;
+      color: var(--pico-muted-color);
+    }
+
+    /* Custom color input row */
+    .custom-color-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 0.3rem;
+    }
+    .custom-color-row input[type="color"] {
+      width: 36px;
+      height: 36px;
+      padding: 2px;
+      border: 1px solid var(--pico-muted-border-color);
+      border-radius: 4px;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+    .custom-color-row input[type="text"] {
+      flex: 1;
+      height: 36px;
+      padding: 0 0.5rem;
+      font-size: 0.8rem;
+      font-family: monospace;
+      box-sizing: border-box;
+      background: #fff;
+    }
+
+    /* Unified color section (always 2-col grid) */
+    .color-section { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+    .color-section h3 { margin-top: 0.4rem; margin-bottom: 0.3rem; }
+    .duo-only { visibility: hidden; }
+    .duo-mode .duo-only { visibility: visible; }
+  </style>
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <h1>Phosphor Icons</h1>
+
+      <!-- Search -->
+      <input type="search" id="searchInput" placeholder="Search 1,512 icons..." autofocus>
+
+      <hr>
+      <!-- Weight filter -->
+      <h3>Weight</h3>
+      <div class="chip-group" id="weightChips">
+        <span class="chip active" data-weight="regular">Regular</span>
+        <span class="chip" data-weight="thin">Thin</span>
+        <span class="chip" data-weight="light">Light</span>
+        <span class="chip" data-weight="bold">Bold</span>
+        <span class="chip" data-weight="fill">Fill</span>
+        <span class="chip" data-weight="duotone">Duo</span>
+      </div>
+
+      <hr>
+      <!-- Color section (unified grid) -->
+      <div class="color-section">
+        <h3 id="colorLabelLeft">Color</h3>
+        <h3 id="colorLabelRight" class="duo-only">Fill Color</h3>
+        <div class="custom-color-row">
+          <input type="color" id="customColorPicker" value="#000000">
+          <input type="text" id="customColorInput" placeholder="#000000" value="#000000">
+        </div>
+        <div class="custom-color-row duo-only">
+          <input type="color" id="duoFillColorPicker" value="#000000">
+          <input type="text" id="duoFillColorInput" placeholder="#000000" value="#000000">
+        </div>
+      </div>
+
+      <!-- Shade filter -->
+      <h3>Quick Shade Filter</h3>
+      <div class="shade-chips" id="shadeChips">
+        <span class="shade-chip" data-shade="all">All</span>
+        <span class="shade-chip" data-shade="50">50</span>
+        <span class="shade-chip" data-shade="100">100</span>
+        <span class="shade-chip" data-shade="200">200</span>
+        <span class="shade-chip" data-shade="300">300</span>
+        <span class="shade-chip" data-shade="400">400</span>
+        <span class="shade-chip active" data-shade="500">500</span>
+        <span style="flex-basis:100%;height:0"></span>
+        <span class="shade-chip" data-shade="600">600</span>
+        <span class="shade-chip" data-shade="700">700</span>
+        <span class="shade-chip" data-shade="800">800</span>
+        <span class="shade-chip" data-shade="900">900</span>
+        <span class="shade-chip" data-shade="950">950</span>
+      </div>
+
+      <!-- Color palette -->
+      <div class="color-palette" id="colorPalette"></div>
+
+      <hr>
+      <!-- Size -->
+      <div class="size-section">
+        <h3>Size</h3>
+        <div></div>
+        <div class="size-input-row">
+          <input type="number" id="sizeInput" value="32" min="8" max="512" step="1">
+          <span>px</span>
+        </div>
+        <div></div>
+        <div class="preset-group" id="sizePresets">
+        <span class="preset-btn" data-size="12">12</span>
+        <span class="preset-btn" data-size="14">14</span>
+        <span class="preset-btn" data-size="16">16</span>
+        <span class="preset-btn" data-size="18">18</span>
+        <span class="preset-btn" data-size="20">20</span>
+        <span class="preset-btn" data-size="22">22</span>
+        <span class="preset-btn" data-size="24">24</span>
+        <span class="preset-btn active" data-size="32">32</span>
+        <span style="flex-basis:100%;height:0"></span>
+        <span class="preset-btn" data-size="40">40</span>
+        <span class="preset-btn" data-size="48">48</span>
+        <span class="preset-btn" data-size="64">64</span>
+        <span class="preset-btn" data-size="96">96</span>
+        <span class="preset-btn" data-size="128">128</span>
+        <span class="preset-btn" data-size="256">256</span>
+        <span class="preset-btn" data-size="512">512</span>
+        </div>
+      </div>
+
+      <hr>
+      <!-- Rotation / Flip -->
+      <h3>Rotation</h3>
+      <div class="transform-row" id="rotationBtns">
+        <span class="transform-btn active" data-rotate="0">0°</span>
+        <span class="transform-btn" data-rotate="90">90°</span>
+        <span class="transform-btn" data-rotate="180">180°</span>
+        <span class="transform-btn" data-rotate="270">270°</span>
+      </div>
+
+      <hr>
+      <h3>Flip</h3>
+      <div class="transform-row" id="flipBtns">
+        <span class="transform-btn" data-flip="none">None</span>
+        <span class="transform-btn" data-flip="horizontal">Horizontal</span>
+        <span class="transform-btn" data-flip="vertical">Vertical</span>
+        <span class="transform-btn" data-flip="both">Both</span>
+      </div>
+
+      <hr>
+      <!-- Actions -->
+      <div class="actions">
+        <button id="btnDownload" disabled>Download PNG</button>
+        <button id="btnCopySvg" class="secondary" disabled>Copy SVG</button>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-content">
+      <div class="grid-header">
+        <div class="icon-count" id="iconCount">Loading icons...</div>
+        <div class="pagination" id="paginationTop">
+          <button id="btnPrev" class="secondary" disabled>&larr; Prev</button>
+          <span class="page-info" id="pageInfo">Page 1 / 1</span>
+          <button id="btnNext" class="secondary" disabled>Next &rarr;</button>
+        </div>
+      </div>
+      <div class="icon-grid" id="iconGrid">
+        <div class="loading-overlay">Loading icons...</div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Preview panel -->
+  <div class="preview-panel" id="previewPanel">
+    <div class="preview-sizes" id="previewSizes"></div>
+    <div class="preview-info">
+      <div class="preview-icon-name" id="previewName"></div>
+      <div class="preview-icon-meta" id="previewMeta"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // ===================== ICON LIST =====================
+    const ICONS = [
+      "acorn","address-book","address-book-tabs","air-traffic-control","airplane","airplane-in-flight","airplane-landing","airplane-takeoff","airplane-taxiing","airplane-tilt","airplay","alarm","alien","align-bottom","align-bottom-simple","align-center-horizontal","align-center-horizontal-simple","align-center-vertical","align-center-vertical-simple","align-left","align-left-simple","align-right","align-right-simple","align-top","align-top-simple","amazon-logo","ambulance","anchor","anchor-simple","android-logo","angle","angular-logo","aperture","app-store-logo","app-window","apple-logo","apple-podcasts-logo","approximate-equals","archive","armchair","arrow-arc-left","arrow-arc-right","arrow-bend-double-up-left","arrow-bend-double-up-right","arrow-bend-down-left","arrow-bend-down-right","arrow-bend-left-down","arrow-bend-left-up","arrow-bend-right-down","arrow-bend-right-up","arrow-bend-up-left","arrow-bend-up-right","arrow-circle-down","arrow-circle-down-left","arrow-circle-down-right","arrow-circle-left","arrow-circle-right","arrow-circle-up","arrow-circle-up-left","arrow-circle-up-right","arrow-clockwise","arrow-counter-clockwise","arrow-down","arrow-down-left","arrow-down-right","arrow-elbow-down-left","arrow-elbow-down-right","arrow-elbow-left","arrow-elbow-left-down","arrow-elbow-left-up","arrow-elbow-right","arrow-elbow-right-down","arrow-elbow-right-up","arrow-elbow-up-left","arrow-elbow-up-right","arrow-fat-down","arrow-fat-left","arrow-fat-line-down","arrow-fat-line-left","arrow-fat-line-right","arrow-fat-line-up","arrow-fat-lines-down","arrow-fat-lines-left","arrow-fat-lines-right","arrow-fat-lines-up","arrow-fat-right","arrow-fat-up","arrow-left","arrow-line-down","arrow-line-down-left","arrow-line-down-right","arrow-line-left","arrow-line-right","arrow-line-up","arrow-line-up-left","arrow-line-up-right","arrow-right","arrow-square-down","arrow-square-down-left","arrow-square-down-right","arrow-square-in","arrow-square-left","arrow-square-out","arrow-square-right","arrow-square-up","arrow-square-up-left","arrow-square-up-right","arrow-u-down-left","arrow-u-down-right","arrow-u-left-down","arrow-u-left-up","arrow-u-right-down","arrow-u-right-up","arrow-u-up-left","arrow-u-up-right","arrow-up","arrow-up-left","arrow-up-right","arrows-clockwise","arrows-counter-clockwise","arrows-down-up","arrows-horizontal","arrows-in","arrows-in-cardinal","arrows-in-line-horizontal","arrows-in-line-vertical","arrows-in-simple","arrows-left-right","arrows-merge","arrows-out","arrows-out-cardinal","arrows-out-line-horizontal","arrows-out-line-vertical","arrows-out-simple","arrows-split","arrows-vertical","article","article-medium","article-ny-times","asclepius","asterisk","asterisk-simple","at","atom","avocado","axe","baby","baby-carriage","backpack","backspace","bag","bag-simple","balloon","bandaids","bank","barbell","barcode","barn","barricade","baseball","baseball-cap","baseball-helmet","basket","basketball","bathtub","battery-charging","battery-charging-vertical","battery-empty","battery-full","battery-high","battery-low","battery-medium","battery-plus","battery-plus-vertical","battery-vertical-empty","battery-vertical-full","battery-vertical-high","battery-vertical-low","battery-vertical-medium","battery-warning","battery-warning-vertical","beach-ball","beanie","bed","beer-bottle","beer-stein","behance-logo","bell","bell-ringing","bell-simple","bell-simple-ringing","bell-simple-slash","bell-simple-z","bell-slash","bell-z","belt","bezier-curve","bicycle","binary","binoculars","biohazard","bird","blueprint","bluetooth","bluetooth-connected","bluetooth-slash","bluetooth-x","boat","bomb","bone","book","book-bookmark","book-open","book-open-text","book-open-user","bookmark","bookmark-simple","bookmarks","bookmarks-simple","books","boot","boules","bounding-box","bowl-food","bowl-steam","bowling-ball","box-arrow-down","box-arrow-up","boxing-glove","brackets-angle","brackets-curly","brackets-round","brackets-square","brain","brandy","bread","bridge","briefcase","briefcase-metal","broadcast","broom","browser","browsers","bug","bug-beetle","bug-droid","building","building-apartment","building-office","buildings","bulldozer","bus","butterfly","cable-car","cactus","cake","calculator","calendar","calendar-blank","calendar-check","calendar-dot","calendar-dots","calendar-heart","calendar-minus","calendar-plus","calendar-slash","calendar-star","calendar-x","call-bell","camera","camera-plus","camera-rotate","camera-slash","campfire","car","car-battery","car-profile","car-simple","cardholder","cards","cards-three","caret-circle-double-down","caret-circle-double-left","caret-circle-double-right","caret-circle-double-up","caret-circle-down","caret-circle-left","caret-circle-right","caret-circle-up","caret-circle-up-down","caret-double-down","caret-double-left","caret-double-right","caret-double-up","caret-down","caret-left","caret-line-down","caret-line-left","caret-line-right","caret-line-up","caret-right","caret-up","caret-up-down","carrot","cash-register","cassette-tape","castle-turret","cat","cell-signal-full","cell-signal-high","cell-signal-low","cell-signal-medium","cell-signal-none","cell-signal-slash","cell-signal-x","cell-tower","certificate","chair","chalkboard","chalkboard-simple","chalkboard-teacher","champagne","charging-station","chart-bar","chart-bar-horizontal","chart-donut","chart-line","chart-line-down","chart-line-up","chart-pie","chart-pie-slice","chart-polar","chart-scatter","chat","chat-centered","chat-centered-dots","chat-centered-slash","chat-centered-text","chat-circle","chat-circle-dots","chat-circle-slash","chat-circle-text","chat-dots","chat-slash","chat-teardrop","chat-teardrop-dots","chat-teardrop-slash","chat-teardrop-text","chat-text","chats","chats-circle","chats-teardrop","check","check-circle","check-fat","check-square","check-square-offset","checkerboard","checks","cheers","cheese","chef-hat","cherries","church","cigarette","cigarette-slash","circle","circle-dashed","circle-half","circle-half-tilt","circle-notch","circles-four","circles-three","circles-three-plus","circuitry","city","clipboard","clipboard-text","clock","clock-afternoon","clock-clockwise","clock-countdown","clock-counter-clockwise","clock-user","closed-captioning","cloud","cloud-arrow-down","cloud-arrow-up","cloud-check","cloud-fog","cloud-lightning","cloud-moon","cloud-rain","cloud-slash","cloud-snow","cloud-sun","cloud-warning","cloud-x","clover","club","coat-hanger","coda-logo","code","code-block","code-simple","codepen-logo","codesandbox-logo","coffee","coffee-bean","coin","coin-vertical","coins","columns","columns-plus-left","columns-plus-right","command","compass","compass-rose","compass-tool","computer-tower","confetti","contactless-payment","control","cookie","cooking-pot","copy","copy-simple","copyleft","copyright","corners-in","corners-out","couch","court-basketball","cow","cowboy-hat","cpu","crane","crane-tower","credit-card","cricket","crop","cross","crosshair","crosshair-simple","crown","crown-cross","crown-simple","cube","cube-focus","cube-transparent","currency-btc","currency-circle-dollar","currency-cny","currency-dollar","currency-dollar-simple","currency-eth","currency-eur","currency-gbp","currency-inr","currency-jpy","currency-krw","currency-kzt","currency-ngn","currency-rub","cursor","cursor-click","cursor-text","cylinder","database","desk","desktop","desktop-tower","detective","dev-to-logo","device-mobile","device-mobile-camera","device-mobile-slash","device-mobile-speaker","device-rotate","device-tablet","device-tablet-camera","device-tablet-speaker","devices","diamond","diamonds-four","dice-five","dice-four","dice-one","dice-six","dice-three","dice-two","disc","disco-ball","discord-logo","divide","dna","dog","door","door-open","dot","dot-outline","dots-nine","dots-six","dots-six-vertical","dots-three","dots-three-circle","dots-three-circle-vertical","dots-three-outline","dots-three-outline-vertical","dots-three-vertical","download","download-simple","dress","dresser","dribbble-logo","drone","drop","drop-half","drop-half-bottom","drop-simple","drop-slash","dropbox-logo","ear","ear-slash","egg","egg-crack","eject","eject-simple","elevator","empty","engine","envelope","envelope-open","envelope-simple","envelope-simple-open","equalizer","equals","eraser","escalator-down","escalator-up","exam","exclamation-mark","exclude","exclude-square","export","eye","eye-closed","eye-slash","eyedropper","eyedropper-sample","eyeglasses","eyes","face-mask","facebook-logo","factory","faders","faders-horizontal","fallout-shelter","fan","farm","fast-forward","fast-forward-circle","feather","fediverse-logo","figma-logo","file","file-archive","file-arrow-down","file-arrow-up","file-audio","file-c","file-c-sharp","file-cloud","file-code","file-cpp","file-css","file-csv","file-dashed","file-doc","file-html","file-image","file-ini","file-jpg","file-js","file-jsx","file-lock","file-magnifying-glass","file-md","file-minus","file-pdf","file-plus","file-png","file-ppt","file-py","file-rs","file-sql","file-svg","file-text","file-ts","file-tsx","file-txt","file-video","file-vue","file-x","file-xls","file-zip","files","film-reel","film-script","film-slate","film-strip","fingerprint","fingerprint-simple","finn-the-human","fire","fire-extinguisher","fire-simple","fire-truck","first-aid","first-aid-kit","fish","fish-simple","flag","flag-banner","flag-banner-fold","flag-checkered","flag-pennant","flame","flashlight","flask","flip-horizontal","flip-vertical","floppy-disk","floppy-disk-back","flow-arrow","flower","flower-lotus","flower-tulip","flying-saucer","folder","folder-dashed","folder-lock","folder-minus","folder-open","folder-plus","folder-simple","folder-simple-dashed","folder-simple-lock","folder-simple-minus","folder-simple-plus","folder-simple-star","folder-simple-user","folder-star","folder-user","folders","football","football-helmet","footprints","fork-knife","four-k","frame-corners","framer-logo","function","funnel","funnel-simple","funnel-simple-x","funnel-x","game-controller","garage","gas-can","gas-pump","gauge","gavel","gear","gear-fine","gear-six","gender-female","gender-intersex","gender-male","gender-neuter","gender-nonbinary","gender-transgender","ghost","gif","gift","git-branch","git-commit","git-diff","git-fork","git-merge","git-pull-request","github-logo","gitlab-logo","gitlab-logo-simple","globe","globe-hemisphere-east","globe-hemisphere-west","globe-simple","globe-simple-x","globe-stand","globe-x","goggles","golf","goodreads-logo","google-cardboard-logo","google-chrome-logo","google-drive-logo","google-logo","google-photos-logo","google-play-logo","google-podcasts-logo","gps","gps-fix","gps-slash","gradient","graduation-cap","grains","grains-slash","graph","graphics-card","greater-than","greater-than-or-equal","grid-four","grid-nine","guitar","hair-dryer","hamburger","hammer","hand","hand-arrow-down","hand-arrow-up","hand-coins","hand-deposit","hand-eye","hand-fist","hand-grabbing","hand-heart","hand-palm","hand-peace","hand-pointing","hand-soap","hand-swipe-left","hand-swipe-right","hand-tap","hand-waving","hand-withdraw","handbag","handbag-simple","hands-clapping","hands-praying","handshake","hard-drive","hard-drives","hard-hat","hash","hash-straight","head-circuit","headlights","headphones","headset","heart","heart-break","heart-half","heart-straight","heart-straight-break","heartbeat","hexagon","high-definition","high-heel","highlighter","highlighter-circle","hockey","hoodie","horse","hospital","hourglass","hourglass-high","hourglass-low","hourglass-medium","hourglass-simple","hourglass-simple-high","hourglass-simple-low","hourglass-simple-medium","house","house-line","house-simple","hurricane","ice-cream","identification-badge","identification-card","image","image-broken","image-square","images","images-square","infinity","info","instagram-logo","intersect","intersect-square","intersect-three","intersection","invoice","island","jar","jar-label","jeep","joystick","kanban","key","key-return","keyboard","keyhole","knife","ladder","ladder-simple","lamp","lamp-pendant","laptop","lasso","lastfm-logo","layout","leaf","lectern","lego","lego-smiley","less-than","less-than-or-equal","letter-circle-h","letter-circle-p","letter-circle-v","lifebuoy","lightbulb","lightbulb-filament","lighthouse","lightning","lightning-a","lightning-slash","line-segment","line-segments","line-vertical","link","link-break","link-simple","link-simple-break","link-simple-horizontal","link-simple-horizontal-break","linkedin-logo","linktree-logo","linux-logo","list","list-bullets","list-checks","list-dashes","list-heart","list-magnifying-glass","list-numbers","list-plus","list-star","lock","lock-key","lock-key-open","lock-laminated","lock-laminated-open","lock-open","lock-simple","lock-simple-open","lockers","log","magic-wand","magnet","magnet-straight","magnifying-glass","magnifying-glass-minus","magnifying-glass-plus","mailbox","map-pin","map-pin-area","map-pin-line","map-pin-plus","map-pin-simple","map-pin-simple-area","map-pin-simple-line","map-trifold","markdown-logo","marker-circle","martini","mask-happy","mask-sad","mastodon-logo","math-operations","matrix-logo","medal","medal-military","medium-logo","megaphone","megaphone-simple","member-of","memory","messenger-logo","meta-logo","meteor","metronome","microphone","microphone-slash","microphone-stage","microscope","microsoft-excel-logo","microsoft-outlook-logo","microsoft-powerpoint-logo","microsoft-teams-logo","microsoft-word-logo","minus","minus-circle","minus-square","money","money-wavy","monitor","monitor-arrow-up","monitor-play","moon","moon-stars","moped","moped-front","mosque","motorcycle","mountains","mouse","mouse-left-click","mouse-middle-click","mouse-right-click","mouse-scroll","mouse-simple","music-note","music-note-simple","music-notes","music-notes-minus","music-notes-plus","music-notes-simple","navigation-arrow","needle","network","network-slash","network-x","newspaper","newspaper-clipping","not-equals","not-member-of","not-subset-of","not-superset-of","notches","note","note-blank","note-pencil","notebook","notepad","notification","notion-logo","nuclear-plant","number-circle-eight","number-circle-five","number-circle-four","number-circle-nine","number-circle-one","number-circle-seven","number-circle-six","number-circle-three","number-circle-two","number-circle-zero","number-eight","number-five","number-four","number-nine","number-one","number-seven","number-six","number-square-eight","number-square-five","number-square-four","number-square-nine","number-square-one","number-square-seven","number-square-six","number-square-three","number-square-two","number-square-zero","number-three","number-two","number-zero","numpad","nut","ny-times-logo","octagon","office-chair","onigiri","open-ai-logo","option","orange","orange-slice","oven","package","paint-brush","paint-brush-broad","paint-brush-household","paint-bucket","paint-roller","palette","panorama","pants","paper-plane","paper-plane-right","paper-plane-tilt","paperclip","paperclip-horizontal","parachute","paragraph","parallelogram","park","password","path","patreon-logo","pause","pause-circle","paw-print","paypal-logo","peace","pen","pen-nib","pen-nib-straight","pencil","pencil-circle","pencil-line","pencil-ruler","pencil-simple","pencil-simple-line","pencil-simple-slash","pencil-slash","pentagon","pentagram","pepper","percent","person","person-arms-spread","person-simple","person-simple-bike","person-simple-circle","person-simple-hike","person-simple-run","person-simple-ski","person-simple-snowboard","person-simple-swim","person-simple-tai-chi","person-simple-throw","person-simple-walk","perspective","phone","phone-call","phone-disconnect","phone-incoming","phone-list","phone-outgoing","phone-pause","phone-plus","phone-slash","phone-transfer","phone-x","phosphor-logo","pi","piano-keys","picnic-table","picture-in-picture","piggy-bank","pill","ping-pong","pint-glass","pinterest-logo","pinwheel","pipe","pipe-wrench","pix-logo","pizza","placeholder","planet","plant","play","play-circle","play-pause","playlist","plug","plug-charging","plugs","plugs-connected","plus","plus-circle","plus-minus","plus-square","poker-chip","police-car","polygon","popcorn","popsicle","potted-plant","power","prescription","presentation","presentation-chart","printer","prohibit","prohibit-inset","projector-screen","projector-screen-chart","pulse","push-pin","push-pin-simple","push-pin-simple-slash","push-pin-slash","puzzle-piece","qr-code","question","question-mark","queue","quotes","rabbit","racquet","radical","radio","radio-button","radioactive","rainbow","rainbow-cloud","ranking","read-cv-logo","receipt","receipt-x","record","rectangle","rectangle-dashed","recycle","reddit-logo","repeat","repeat-once","replit-logo","resize","rewind","rewind-circle","road-horizon","robot","rocket","rocket-launch","rows","rows-plus-bottom","rows-plus-top","rss","rss-simple","rug","ruler","sailboat","scales","scan","scan-smiley","scissors","scooter","screencast","screwdriver","scribble","scribble-loop","scroll","seal","seal-check","seal-percent","seal-question","seal-warning","seat","seatbelt","security-camera","selection","selection-all","selection-background","selection-foreground","selection-inverse","selection-plus","selection-slash","shapes","share","share-fat","share-network","shield","shield-check","shield-checkered","shield-chevron","shield-plus","shield-slash","shield-star","shield-warning","shipping-container","shirt-folded","shooting-star","shopping-bag","shopping-bag-open","shopping-cart","shopping-cart-simple","shovel","shower","shrimp","shuffle","shuffle-angular","shuffle-simple","sidebar","sidebar-simple","sigma","sign-in","sign-out","signature","signpost","sim-card","siren","sketch-logo","skip-back","skip-back-circle","skip-forward","skip-forward-circle","skull","skype-logo","slack-logo","sliders","sliders-horizontal","slideshow","smiley","smiley-angry","smiley-blank","smiley-meh","smiley-melting","smiley-nervous","smiley-sad","smiley-sticker","smiley-wink","smiley-x-eyes","snapchat-logo","sneaker","sneaker-move","snowflake","soccer-ball","sock","solar-panel","solar-roof","sort-ascending","sort-descending","soundcloud-logo","spade","sparkle","speaker-hifi","speaker-high","speaker-low","speaker-none","speaker-simple-high","speaker-simple-low","speaker-simple-none","speaker-simple-slash","speaker-simple-x","speaker-slash","speaker-x","speedometer","sphere","spinner","spinner-ball","spinner-gap","spiral","split-horizontal","split-vertical","spotify-logo","spray-bottle","square","square-half","square-half-bottom","square-logo","square-split-horizontal","square-split-vertical","squares-four","stack","stack-minus","stack-overflow-logo","stack-plus","stack-simple","stairs","stamp","standard-definition","star","star-and-crescent","star-four","star-half","star-of-david","steam-logo","steering-wheel","steps","stethoscope","sticker","stool","stop","stop-circle","storefront","strategy","stripe-logo","student","subset-of","subset-proper-of","subtitles","subtitles-slash","subtract","subtract-square","subway","suitcase","suitcase-rolling","suitcase-simple","sun","sun-dim","sun-horizon","sunglasses","superset-of","superset-proper-of","swap","swatches","swimming-pool","sword","synagogue","syringe","t-shirt","table","tabs","tag","tag-chevron","tag-simple","target","taxi","tea-bag","telegram-logo","television","television-simple","tennis-ball","tent","terminal","terminal-window","test-tube","text-a-underline","text-aa","text-align-center","text-align-justify","text-align-left","text-align-right","text-b","text-columns","text-h","text-h-five","text-h-four","text-h-one","text-h-six","text-h-three","text-h-two","text-indent","text-italic","text-outdent","text-strikethrough","text-subscript","text-superscript","text-t","text-t-slash","text-underline","textbox","thermometer","thermometer-cold","thermometer-hot","thermometer-simple","threads-logo","three-d","thumbs-down","thumbs-up","ticket","tidal-logo","tiktok-logo","tilde","timer","tip-jar","tipi","tire","toggle-left","toggle-right","toilet","toilet-paper","toolbox","tooth","tornado","tote","tote-simple","towel","tractor","trademark","trademark-registered","traffic-cone","traffic-sign","traffic-signal","train","train-regional","train-simple","tram","translate","trash","trash-simple","tray","tray-arrow-down","tray-arrow-up","treasure-chest","tree","tree-evergreen","tree-palm","tree-structure","tree-view","trend-down","trend-up","triangle","triangle-dashed","trolley","trolley-suitcase","trophy","truck","truck-trailer","tumblr-logo","twitch-logo","twitter-logo","umbrella","umbrella-simple","union","unite","unite-square","upload","upload-simple","usb","user","user-check","user-circle","user-circle-check","user-circle-dashed","user-circle-gear","user-circle-minus","user-circle-plus","user-focus","user-gear","user-list","user-minus","user-plus","user-rectangle","user-sound","user-square","user-switch","users","users-four","users-three","van","vault","vector-three","vector-two","vibrate","video","video-camera","video-camera-slash","video-conference","vignette","vinyl-record","virtual-reality","virus","visor","voicemail","volleyball","wall","wallet","warehouse","warning","warning-circle","warning-diamond","warning-octagon","washing-machine","watch","wave-sawtooth","wave-sine","wave-square","wave-triangle","waveform","waveform-slash","waves","webcam","webcam-slash","webhooks-logo","wechat-logo","whatsapp-logo","wheelchair","wheelchair-motion","wifi-high","wifi-low","wifi-medium","wifi-none","wifi-slash","wifi-x","wind","windmill","windows-logo","wine","wrench","x","x-circle","x-logo","x-square","yarn","yin-yang","youtube-logo"
+    ];
+
+    // ===================== TAILWIND 4 COLORS =====================
+    const TW_COLORS = {
+      slate:   { 50:"#f8fafc",100:"#f1f5f9",200:"#e2e8f0",300:"#cbd5e1",400:"#94a3b8",500:"#64748b",600:"#475569",700:"#334155",800:"#1e293b",900:"#0f172a",950:"#020617" },
+      gray:    { 50:"#f9fafb",100:"#f3f4f6",200:"#e5e7eb",300:"#d1d5db",400:"#9ca3af",500:"#6b7280",600:"#4b5563",700:"#374151",800:"#1f2937",900:"#111827",950:"#030712" },
+      zinc:    { 50:"#fafafa",100:"#f4f4f5",200:"#e4e4e7",300:"#d4d4d8",400:"#a1a1aa",500:"#71717a",600:"#52525b",700:"#3f3f46",800:"#27272a",900:"#18181b",950:"#09090b" },
+      neutral: { 50:"#fafafa",100:"#f5f5f5",200:"#e5e5e5",300:"#d4d4d4",400:"#a3a3a3",500:"#737373",600:"#525252",700:"#404040",800:"#262626",900:"#171717",950:"#0a0a0a" },
+      stone:   { 50:"#fafaf9",100:"#f5f5f4",200:"#e7e5e4",300:"#d6d3d1",400:"#a8a29e",500:"#78716c",600:"#57534e",700:"#44403c",800:"#292524",900:"#1c1917",950:"#0c0a09" },
+      red:     { 50:"#fef2f2",100:"#fee2e2",200:"#fecaca",300:"#fca5a5",400:"#f87171",500:"#ef4444",600:"#dc2626",700:"#b91c1c",800:"#991b1b",900:"#7f1d1d",950:"#450a0a" },
+      orange:  { 50:"#fff7ed",100:"#ffedd5",200:"#fed7aa",300:"#fdba74",400:"#fb923c",500:"#f97316",600:"#ea580c",700:"#c2410c",800:"#9a3412",900:"#7c2d12",950:"#431407" },
+      amber:   { 50:"#fffbeb",100:"#fef3c7",200:"#fde68a",300:"#fcd34d",400:"#fbbf24",500:"#f59e0b",600:"#d97706",700:"#b45309",800:"#92400e",900:"#78350f",950:"#451a03" },
+      yellow:  { 50:"#fefce8",100:"#fef9c3",200:"#fef08a",300:"#fde047",400:"#facc15",500:"#eab308",600:"#ca8a04",700:"#a16207",800:"#854d0e",900:"#713f12",950:"#422006" },
+      lime:    { 50:"#f7fee7",100:"#ecfccb",200:"#d9f99d",300:"#bef264",400:"#a3e635",500:"#84cc16",600:"#65a30d",700:"#4d7c0f",800:"#3f6212",900:"#365314",950:"#1a2e05" },
+      green:   { 50:"#f0fdf4",100:"#dcfce7",200:"#bbf7d0",300:"#86efac",400:"#4ade80",500:"#22c55e",600:"#16a34a",700:"#15803d",800:"#166534",900:"#14532d",950:"#052e16" },
+      emerald: { 50:"#ecfdf5",100:"#d1fae5",200:"#a7f3d0",300:"#6ee7b7",400:"#34d399",500:"#10b981",600:"#059669",700:"#047857",800:"#065f46",900:"#064e3b",950:"#022c22" },
+      teal:    { 50:"#f0fdfa",100:"#ccfbf1",200:"#99f6e4",300:"#5eead4",400:"#2dd4bf",500:"#14b8a6",600:"#0d9488",700:"#0f766e",800:"#115e59",900:"#134e4a",950:"#042f2e" },
+      cyan:    { 50:"#ecfeff",100:"#cffafe",200:"#a5f3fc",300:"#67e8f9",400:"#22d3ee",500:"#06b6d4",600:"#0891b2",700:"#0e7490",800:"#155e75",900:"#164e63",950:"#083344" },
+      sky:     { 50:"#f0f9ff",100:"#e0f2fe",200:"#bae6fd",300:"#7dd3fc",400:"#38bdf8",500:"#0ea5e9",600:"#0284c7",700:"#0369a1",800:"#075985",900:"#0c4a6e",950:"#082f49" },
+      blue:    { 50:"#eff6ff",100:"#dbeafe",200:"#bfdbfe",300:"#93c5fd",400:"#60a5fa",500:"#3b82f6",600:"#2563eb",700:"#1d4ed8",800:"#1e40af",900:"#1e3a8a",950:"#172554" },
+      indigo:  { 50:"#eef2ff",100:"#e0e7ff",200:"#c7d2fe",300:"#a5b4fc",400:"#818cf8",500:"#6366f1",600:"#4f46e5",700:"#4338ca",800:"#3730a3",900:"#312e81",950:"#1e1b4b" },
+      violet:  { 50:"#f5f3ff",100:"#ede9fe",200:"#ddd6fe",300:"#c4b5fd",400:"#a78bfa",500:"#8b5cf6",600:"#7c3aed",700:"#6d28d9",800:"#5b21b6",900:"#4c1d95",950:"#2e1065" },
+      purple:  { 50:"#faf5ff",100:"#f3e8ff",200:"#e9d5ff",300:"#d8b4fe",400:"#c084fc",500:"#a855f7",600:"#9333ea",700:"#7e22ce",800:"#6b21a8",900:"#581c87",950:"#3b0764" },
+      fuchsia: { 50:"#fdf4ff",100:"#fae8ff",200:"#f5d0fe",300:"#f0abfc",400:"#e879f9",500:"#d946ef",600:"#c026d3",700:"#a21caf",800:"#86198f",900:"#701a75",950:"#4a044e" },
+      pink:    { 50:"#fdf2f8",100:"#fce7f3",200:"#fbcfe8",300:"#f9a8d4",400:"#f472b6",500:"#ec4899",600:"#db2777",700:"#be185d",800:"#9d174d",900:"#831843",950:"#500724" },
+      rose:    { 50:"#fff1f2",100:"#ffe4e6",200:"#fecdd3",300:"#fda4af",400:"#fb7185",500:"#f43f5e",600:"#e11d48",700:"#be123c",800:"#9f1239",900:"#881337",950:"#4c0519" }
+    };
+
+    const SHADES = ["50","100","200","300","400","500","600","700","800","900","950"];
+
+    // ===================== STATE =====================
+    let state = {
+      search: "",
+      weight: "regular",
+      color: "#000000",
+      colorName: "Black",
+      duoFillColor: "#000000",
+      duoFillColorName: "Black",
+      shade: "500",
+      size: 32,
+      rotation: 0,
+      flip: "none",
+      selectedIcon: null,
+      svgCache: {}
+    };
+
+    // ===================== SVG FETCHING =====================
+    const SVG_BASE = "https://unpkg.com/@phosphor-icons/core@2.1.1/assets";
+
+    async function fetchSvg(iconName, weight) {
+      const key = `${iconName}-${weight}`;
+      if (state.svgCache[key]) return state.svgCache[key];
+      const weightPath = weight === "regular" ? "regular" : weight;
+      const suffix = weight === "regular" ? "" : `-${weight}`;
+      const url = `${SVG_BASE}/${weightPath}/${iconName}${suffix}.svg`;
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const svg = await res.text();
+        state.svgCache[key] = svg;
+        return svg;
+      } catch (e) {
+        console.warn(`Failed to fetch ${url}:`, e);
+        return null;
+      }
+    }
+
+    // ===================== RENDERING =====================
+    const iconGrid = document.getElementById("iconGrid");
+    const iconCount = document.getElementById("iconCount");
+    const PAGE_SIZE = 100; // 10x10
+    let currentPage = 0;
+    let filteredIcons = [];
+
+    function getFilteredIcons() {
+      const q = state.search.toLowerCase().trim();
+      if (!q) return ICONS;
+      return ICONS.filter(name => name.includes(q));
+    }
+
+    function getTotalPages() {
+      return Math.max(1, Math.ceil(filteredIcons.length / PAGE_SIZE));
+    }
+
+    function updatePagination() {
+      const total = getTotalPages();
+      const page = currentPage + 1;
+      document.getElementById("pageInfo").textContent = `Page ${page} / ${total}`;
+      document.getElementById("btnPrev").disabled = currentPage === 0;
+      document.getElementById("btnNext").disabled = currentPage >= total - 1;
+    }
+
+    function renderGrid() {
+      filteredIcons = getFilteredIcons();
+      // Clamp page
+      if (currentPage >= getTotalPages()) currentPage = Math.max(0, getTotalPages() - 1);
+
+      iconCount.textContent = `${filteredIcons.length} icon${filteredIcons.length !== 1 ? "s" : ""}`;
+      iconGrid.innerHTML = "";
+
+      const start = currentPage * PAGE_SIZE;
+      const end = Math.min(start + PAGE_SIZE, filteredIcons.length);
+      const pageIcons = filteredIcons.slice(start, end);
+
+      const fragment = document.createDocumentFragment();
+      for (const name of pageIcons) {
+        const card = document.createElement("div");
+        card.className = "icon-card" + (state.selectedIcon === name ? " selected" : "");
+        card.dataset.icon = name;
+        card.innerHTML = `
+          <svg viewBox="0 0 256 256" fill="none">
+            <rect width="256" height="256" fill="transparent"/>
+          </svg>
+          <span class="icon-name" title="${name}">${name}</span>
+        `;
+        card.addEventListener("click", () => selectIcon(name));
+        fragment.appendChild(card);
+        // Immediately start loading
+        loadIconSvg(card, name);
+      }
+      iconGrid.appendChild(fragment);
+      updatePagination();
+    }
+
+    async function loadIconSvg(card, name) {
+      const svg = await fetchSvg(name, state.weight);
+      if (svg && card.isConnected) {
+        const container = document.createElement("div");
+        container.innerHTML = svg;
+        const svgEl = container.querySelector("svg");
+        if (svgEl) {
+          svgEl.removeAttribute("width");
+          svgEl.removeAttribute("height");
+          if (state.weight === "duotone") {
+            applyDuotoneColors(svgEl);
+          } else {
+            svgEl.style.color = state.color;
+            svgEl.querySelectorAll("[fill]").forEach(el => {
+              if (el.getAttribute("fill") === "currentColor" || el.getAttribute("fill") === "#000000" || el.getAttribute("fill") === "#000") {
+                el.setAttribute("fill", "currentColor");
+              }
+            });
+            svgEl.querySelectorAll("[stroke]").forEach(el => {
+              if (el.getAttribute("stroke") === "currentColor" || el.getAttribute("stroke") === "#000000" || el.getAttribute("stroke") === "#000") {
+                el.setAttribute("stroke", "currentColor");
+              }
+            });
+          }
+          const old = card.querySelector("svg");
+          if (old) old.replaceWith(svgEl);
+        }
+      }
+    }
+
+    // Apply separate fill/outline colors for duotone SVGs
+    function applyDuotoneColors(svgEl) {
+      // Duotone icons: elements with opacity="0.2" are the fill layer, others are the outline
+      // Remove root fill so children don't inherit — we set explicit fills on each child
+      svgEl.removeAttribute("fill");
+      svgEl.style.color = "";
+      const children = svgEl.querySelectorAll("path, rect, circle, ellipse, line, polyline, polygon, g");
+      children.forEach(el => {
+        const isFilledLayer = el.getAttribute("opacity") === "0.2";
+        const color = isFilledLayer ? state.duoFillColor : state.color;
+        // Always set fill — previous calls may have set it to a hex that no longer matches
+        el.setAttribute("fill", color);
+        if (el.hasAttribute("stroke")) {
+          el.setAttribute("stroke", color);
+        }
+      });
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      renderGrid();
+      document.querySelector(".main-content").scrollTop = 0;
+    }
+
+    // ===================== ICON SELECTION =====================
+    async function selectIcon(name) {
+      state.selectedIcon = name;
+      // Update selected state in grid
+      document.querySelectorAll(".icon-card").forEach(c => {
+        c.classList.toggle("selected", c.dataset.icon === name);
+      });
+      // Add padding for preview panel
+      document.querySelector(".main-content").classList.add("has-preview");
+      // Update preview
+      await updatePreview();
+      // Enable buttons
+      document.getElementById("btnDownload").disabled = false;
+      document.getElementById("btnCopySvg").disabled = false;
+    }
+
+    async function updatePreview() {
+      if (!state.selectedIcon) return;
+      const panel = document.getElementById("previewPanel");
+      const sizesContainer = document.getElementById("previewSizes");
+      const nameEl = document.getElementById("previewName");
+      const metaEl = document.getElementById("previewMeta");
+
+      const svg = await fetchSvg(state.selectedIcon, state.weight);
+      if (!svg) return;
+
+      // Show preview at multiple sizes
+      const previewSizes = [16, 24, 32, 48, 64, 96];
+      sizesContainer.innerHTML = "";
+      for (const s of previewSizes) {
+        const div = document.createElement("div");
+        div.className = "preview-size-item";
+        const processed = processedSvg(svg, s);
+        div.innerHTML = processed + `<div class="preview-size-label">${s}px</div>`;
+        sizesContainer.appendChild(div);
+      }
+
+      nameEl.textContent = state.selectedIcon;
+      if (state.weight === "duotone") {
+        metaEl.textContent = `${state.weight} · ${state.size}px · ${state.rotation}° · outline: ${state.colorName} (${state.color}) · fill: ${state.duoFillColorName} (${state.duoFillColor})`;
+      } else {
+        metaEl.textContent = `${state.weight} · ${state.size}px · ${state.rotation}° · ${state.colorName} (${state.color})`;
+      }
+
+      panel.classList.add("visible");
+    }
+
+    function processedSvg(svgString, size) {
+      const container = document.createElement("div");
+      container.innerHTML = svgString;
+      const svg = container.querySelector("svg");
+      if (!svg) return svgString;
+
+      svg.setAttribute("width", size);
+      svg.setAttribute("height", size);
+
+      // Apply transforms
+      let transform = "";
+      if (state.rotation !== 0) transform += `rotate(${state.rotation}deg) `;
+      if (state.flip === "horizontal") transform += "scaleX(-1) ";
+      if (state.flip === "vertical") transform += "scaleY(-1) ";
+      if (state.flip === "both") transform += "scale(-1) ";
+      if (transform) svg.style.transform = transform.trim();
+
+      // Color — duotone gets separate fill/outline colors
+      if (state.weight === "duotone") {
+        applyDuotoneColors(svg);
+      } else {
+        svg.style.color = state.color;
+        svg.querySelectorAll("[fill]").forEach(el => {
+          const f = el.getAttribute("fill");
+          if (f === "currentColor" || f === "#000000" || f === "#000") {
+            el.setAttribute("fill", "currentColor");
+          }
+        });
+        svg.querySelectorAll("[stroke]").forEach(el => {
+          const s = el.getAttribute("stroke");
+          if (s === "currentColor" || s === "#000000" || s === "#000") {
+            el.setAttribute("stroke", "currentColor");
+          }
+        });
+      }
+
+      return container.innerHTML;
+    }
+
+    // ===================== COLOR PALETTE =====================
+    function renderColorPalette() {
+      const palette = document.getElementById("colorPalette");
+      palette.innerHTML = "";
+
+      const neutralFamilies = ["slate", "gray", "zinc", "neutral", "stone"];
+      const warmFamilies = ["red", "orange", "amber", "yellow", "lime", "rose", "pink", "fuchsia"];
+      const coldFamilies = ["green", "emerald", "teal", "cyan", "sky", "blue", "indigo", "violet", "purple"];
+
+      const groups = [
+        { label: "Neutrals", families: neutralFamilies, extras: ["#000000", "#ffffff"] },
+        { label: "Warm", families: warmFamilies, extras: [] },
+        { label: "Cool", families: coldFamilies, extras: [] }
+      ];
+
+      for (const group of groups) {
+        const grid = document.createElement("div");
+        grid.className = "color-group-grid";
+
+        for (const hex of group.extras) {
+          const name = hex === "#000000" ? "Black" : "White";
+          const sw = document.createElement("div");
+          sw.className = "color-swatch" + (state.color === hex ? " active" : "");
+          sw.style.background = hex;
+          sw.style.border = "1px solid #ccc";
+          sw.dataset.color = hex;
+          sw.dataset.name = name;
+          sw.title = `${name} ${hex}`;
+          grid.appendChild(sw);
+        }
+
+        for (const colorName of group.families) {
+          const shades = TW_COLORS[colorName];
+          for (const shade of SHADES) {
+            if (state.shade !== "all" && shade !== state.shade) continue;
+            const hex = shades[shade];
+            const sw = document.createElement("div");
+            sw.className = "color-swatch" + (state.color === hex ? " active" : "");
+            sw.style.background = hex;
+            sw.dataset.color = hex;
+            sw.dataset.name = `${colorName}-${shade}`;
+            sw.title = `${colorName}-${shade} ${hex}`;
+            grid.appendChild(sw);
+          }
+        }
+
+        palette.appendChild(grid);
+      }
+
+      // Click handler
+      palette.addEventListener("click", (e) => {
+        const sw = e.target.closest(".color-swatch");
+        if (sw) {
+          setColor(sw.dataset.color, sw.dataset.name);
+        }
+      });
+    }
+
+    function setColor(hex, name) {
+      state.color = hex;
+      state.colorName = name || hex;
+      document.getElementById("customColorPicker").value = hex;
+      document.getElementById("customColorInput").value = hex;
+
+      // Update active swatch
+      document.querySelectorAll(".color-swatch").forEach(s => {
+        s.classList.toggle("active", s.dataset.color === hex);
+      });
+
+      // Update grid icon colors
+      if (state.weight === "duotone") {
+        recolorDuotoneGrid();
+      } else {
+        document.querySelectorAll(".icon-card svg").forEach(svg => {
+          svg.style.color = hex;
+        });
+      }
+
+      updatePreview();
+    }
+
+    function setDuoFillColor(hex, name) {
+      state.duoFillColor = hex;
+      state.duoFillColorName = name || hex;
+      document.getElementById("duoFillColorPicker").value = hex;
+      document.getElementById("duoFillColorInput").value = hex;
+
+      recolorDuotoneGrid();
+      updatePreview();
+    }
+
+    function recolorDuotoneGrid() {
+      document.querySelectorAll(".icon-card svg").forEach(svg => {
+        applyDuotoneColors(svg);
+      });
+    }
+
+    function updateDuoColorUI() {
+      const isDuo = state.weight === "duotone";
+      const section = document.querySelector(".color-section");
+      section.classList.toggle("duo-mode", isDuo);
+      document.getElementById("colorLabelLeft").textContent = isDuo ? "Outline Color" : "Color";
+      if (isDuo) {
+        document.getElementById("duoFillColorPicker").value = state.duoFillColor;
+        document.getElementById("duoFillColorInput").value = state.duoFillColor;
+      }
+    }
+
+    // ===================== DOWNLOAD PNG =====================
+    function getTrimmedViewBox(svgEl) {
+      // Temporarily add SVG to DOM to measure actual content bounds
+      svgEl.style.position = "absolute";
+      svgEl.style.visibility = "hidden";
+      document.body.appendChild(svgEl);
+      try {
+        const contentEl = svgEl.querySelector("g") || svgEl.querySelector("path") || svgEl;
+        const bbox = contentEl.getBBox();
+        const pad = 2; // tiny padding to avoid clipping strokes
+        return {
+          x: Math.max(0, bbox.x - pad),
+          y: Math.max(0, bbox.y - pad),
+          w: bbox.width + pad * 2,
+          h: bbox.height + pad * 2
+        };
+      } finally {
+        svgEl.remove();
+        svgEl.style.position = "";
+        svgEl.style.visibility = "";
+      }
+    }
+
+    async function downloadPng() {
+      if (!state.selectedIcon) return;
+      const svg = await fetchSvg(state.selectedIcon, state.weight);
+      if (!svg) return;
+
+      const processed = processedSvg(svg, state.size);
+      const container = document.createElement("div");
+      container.innerHTML = processed;
+      const svgEl = container.querySelector("svg");
+      if (!svgEl) return;
+
+      // Inline the color (duotone already has colors inlined by processedSvg → applyDuotoneColors)
+      if (state.weight === "duotone") {
+        svgEl.style.color = "";
+      } else {
+        if (svgEl.getAttribute("fill") === "currentColor") svgEl.setAttribute("fill", state.color);
+        if (svgEl.getAttribute("stroke") === "currentColor") svgEl.setAttribute("stroke", state.color);
+        svgEl.querySelectorAll("[fill='currentColor']").forEach(el => el.setAttribute("fill", state.color));
+        svgEl.querySelectorAll("[stroke='currentColor']").forEach(el => el.setAttribute("stroke", state.color));
+        svgEl.style.color = "";
+      }
+
+      // Handle transform by wrapping content in a <g> with transform
+      if (state.rotation !== 0 || state.flip !== "none") {
+        const inner = svgEl.innerHTML;
+        svgEl.style.transform = "";
+        const viewBox = svgEl.getAttribute("viewBox") || `0 0 256 256`;
+        const [,, vw, vh] = viewBox.split(" ").map(Number);
+        const vcx = vw / 2, vcy = vh / 2;
+
+        let parts = [];
+        parts.push(`translate(${vcx}, ${vcy})`);
+        if (state.rotation !== 0) parts.push(`rotate(${state.rotation})`);
+        if (state.flip === "horizontal") parts.push("scale(-1, 1)");
+        if (state.flip === "vertical") parts.push("scale(1, -1)");
+        if (state.flip === "both") parts.push("scale(-1, -1)");
+        parts.push(`translate(${-vcx}, ${-vcy})`);
+
+        svgEl.innerHTML = `<g transform="${parts.join(" ")}">${inner}</g>`;
+      }
+
+      // Trim viewBox to actual icon content (remove Phosphor's built-in padding)
+      const trimmed = getTrimmedViewBox(svgEl);
+      svgEl.setAttribute("viewBox", `${trimmed.x} ${trimmed.y} ${trimmed.w} ${trimmed.h}`);
+
+      const svgData = new XMLSerializer().serializeToString(svgEl);
+      const blob = new Blob([svgData], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = state.size;
+        canvas.height = state.size;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, state.size, state.size);
+        URL.revokeObjectURL(url);
+
+        canvas.toBlob(pngBlob => {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(pngBlob);
+          const colorPart = state.weight === "duotone"
+            ? `${state.colorName.toLowerCase()}-fill-${state.duoFillColorName.toLowerCase()}`
+            : state.colorName.toLowerCase();
+          a.download = `icon-${state.size}px-${state.selectedIcon}-${colorPart}-${state.weight}${state.rotation !== 0 ? `-${state.rotation}deg` : ''}${state.flip !== 'none' ? `-flip-${state.flip}` : ''}.png`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          showToast("PNG downloaded!");
+        }, "image/png");
+      };
+      img.src = url;
+    }
+
+    // ===================== COPY SVG =====================
+    async function copySvg() {
+      if (!state.selectedIcon) return;
+      const svg = await fetchSvg(state.selectedIcon, state.weight);
+      if (!svg) return;
+      const processed = processedSvg(svg, state.size);
+
+      // Inline colors for a standalone SVG (include svgEl itself, not just descendants)
+      const container = document.createElement("div");
+      container.innerHTML = processed;
+      const svgEl = container.querySelector("svg");
+      if (svgEl) {
+        if (state.weight !== "duotone") {
+          if (svgEl.getAttribute("fill") === "currentColor") svgEl.setAttribute("fill", state.color);
+          if (svgEl.getAttribute("stroke") === "currentColor") svgEl.setAttribute("stroke", state.color);
+          svgEl.querySelectorAll("[fill='currentColor']").forEach(el => el.setAttribute("fill", state.color));
+          svgEl.querySelectorAll("[stroke='currentColor']").forEach(el => el.setAttribute("stroke", state.color));
+        }
+        svgEl.removeAttribute("style");
+
+        // Trim viewBox to actual icon content
+        const trimmed = getTrimmedViewBox(svgEl);
+        svgEl.setAttribute("viewBox", `${trimmed.x} ${trimmed.y} ${trimmed.w} ${trimmed.h}`);
+      }
+
+      try {
+        await navigator.clipboard.writeText(container.innerHTML);
+        showToast("SVG copied to clipboard!");
+      } catch {
+        showToast("Failed to copy - try again");
+      }
+    }
+
+    // ===================== TOAST =====================
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      toast.textContent = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 2000);
+    }
+
+    // ===================== EVENT HANDLERS =====================
+    // Search
+    document.getElementById("searchInput").addEventListener("input", (e) => {
+      state.search = e.target.value;
+      currentPage = 0;
+      renderGrid();
+    });
+
+    // Pagination
+    document.getElementById("btnPrev").addEventListener("click", () => goToPage(currentPage - 1));
+    document.getElementById("btnNext").addEventListener("click", () => goToPage(currentPage + 1));
+
+    // Weight chips
+    document.getElementById("weightChips").addEventListener("click", (e) => {
+      const chip = e.target.closest(".chip");
+      if (!chip) return;
+      document.querySelectorAll("#weightChips .chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      state.weight = chip.dataset.weight;
+      state.svgCache = {}; // Clear cache on weight change
+      updateDuoColorUI();
+      currentPage = 0;
+      renderGrid();
+      updatePreview();
+    });
+
+    // Shade chips
+    document.getElementById("shadeChips").addEventListener("click", (e) => {
+      const chip = e.target.closest(".shade-chip");
+      if (!chip) return;
+      document.querySelectorAll("#shadeChips .shade-chip").forEach(c => c.classList.remove("active"));
+      chip.classList.add("active");
+      state.shade = chip.dataset.shade;
+      renderColorPalette();
+    });
+
+    // Size input
+    document.getElementById("sizeInput").addEventListener("input", (e) => {
+      const val = parseInt(e.target.value);
+      if (val && val > 0) {
+        state.size = val;
+        // Update active preset
+        document.querySelectorAll("#sizePresets .preset-btn").forEach(b => {
+          b.classList.toggle("active", parseInt(b.dataset.size) === val);
+        });
+        updatePreview();
+      }
+    });
+
+    // Size presets
+    document.getElementById("sizePresets").addEventListener("click", (e) => {
+      const btn = e.target.closest(".preset-btn");
+      if (!btn) return;
+      const size = parseInt(btn.dataset.size);
+      state.size = size;
+      document.getElementById("sizeInput").value = size;
+      document.querySelectorAll("#sizePresets .preset-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      updatePreview();
+    });
+
+    // Rotation
+    document.getElementById("rotationBtns").addEventListener("click", (e) => {
+      const btn = e.target.closest(".transform-btn");
+      if (!btn) return;
+      state.rotation = parseInt(btn.dataset.rotate);
+      document.querySelectorAll("#rotationBtns .transform-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      updatePreview();
+    });
+
+    // Flip
+    document.getElementById("flipBtns").addEventListener("click", (e) => {
+      const btn = e.target.closest(".transform-btn");
+      if (!btn) return;
+      state.flip = btn.dataset.flip;
+      document.querySelectorAll("#flipBtns .transform-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      updatePreview();
+    });
+
+    // Custom color picker (single mode)
+    document.getElementById("customColorPicker").addEventListener("input", (e) => {
+      setColor(e.target.value, "Custom");
+    });
+    document.getElementById("customColorInput").addEventListener("change", (e) => {
+      const val = e.target.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+        setColor(val, "Custom");
+      }
+    });
+
+    // Duotone fill color picker
+    document.getElementById("duoFillColorPicker").addEventListener("input", (e) => {
+      setDuoFillColor(e.target.value, "Custom");
+    });
+    document.getElementById("duoFillColorInput").addEventListener("change", (e) => {
+      const val = e.target.value.trim();
+      if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+        setDuoFillColor(val, "Custom");
+      }
+    });
+
+    // Download / Copy buttons
+    document.getElementById("btnDownload").addEventListener("click", downloadPng);
+    document.getElementById("btnCopySvg").addEventListener("click", copySvg);
+
+    // ===================== INIT =====================
+    renderColorPalette();
+    renderGrid();
+  </script>
+</body>
+</html>
